@@ -13,8 +13,13 @@ typedef struct translationLookasideBuffer {
     int frame[16];
 }translationLookasideBuffer;
 
+translationLookasideBuffer tlb;
+pageTable pTable;
+
 char* binary;
 int memory[256][256];
+int memIndex;
+int tlbIndex;
 
 void read_from_file(char* filename){
     FILE *fp = fopen(filename, "r");
@@ -56,21 +61,17 @@ void readBinary(char* filename) {
 }
 
 int findFrame(int pageNum, int offset) {
-    int memIndex=0;
-    int tlbIndex=0;
-    translationLookasideBuffer tlb;
-    pageTable pTable;
-    for (int x=0; x<256; x++) {
-        pTable.validBit[x]=0;
-    }
+    int foundIndex=0;
     bool inTLB;
     for (int x=0; x<16; x++) {
         if (tlb.pageNumber[x]==pageNum) {
             inTLB=true;
+            foundIndex=x;
             break;
         }
     }
     printf("a\n");
+    //TLB miss
     if (!inTLB) {
         printf("b\n");
         printf("%d\n",pTable.validBit[pageNum]);
@@ -80,6 +81,7 @@ int findFrame(int pageNum, int offset) {
             int start=pageNum*256;
             for (int i=0; i<256; i++) {
                 memory[memIndex][i]=binary[start+i];
+                //printf("%d,%d,%d\n",memory[memIndex][i],binary[start+i],i);
             }
             
             //Update tlb
@@ -99,13 +101,47 @@ int findFrame(int pageNum, int offset) {
             memIndex++;
             return memory[memIndex][offset];
         }
+        else {
+            //Update tlb
+            tlb.pageNumber[tlbIndex]=pageNum;
+            tlb.frame[tlbIndex]=memIndex;
+            tlbIndex++;
+            if (tlbIndex>15) {
+                tlbIndex=0;
+            }
+
+            //Found frame in page table
+            printf("Oh yeah do it: %d\n",memory[pTable.frame[pageNum]][offset]);
+            return memory[pTable.frame[pageNum]][offset];
+        }
+    }
+    //Page number found.
+    else {
+        /*
+        for (int j=0; j<256; j++) {
+            printf("%d, %d\n",memory[tlb.pageNumber[foundIndex]][j],j);
+        }
+        */
+        printf("%d\n",tlb.pageNumber[foundIndex]);
+        printf("%d\n",offset);
+        printf("Yeah do it: %d\n",memory[tlb.frame[foundIndex]][offset]);
+        return memory[tlb.frame[foundIndex]][offset];
     }
     return 0;
 }
 
 int main() {
+    for (int x=0; x<256; x++) {
+        pTable.validBit[x]=0;
+    }
     read_from_file("addresses.txt");
     readBinary("BACKING_STORE.bin");
     findFrame(250, 243);
+    /*
+    for (int y=0; y<256; y++) {
+        printf("m %d\n",memory[0][y]);
+    }
+    */
+    findFrame(250, 242);
     return 0;
 }
