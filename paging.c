@@ -43,11 +43,10 @@ void readBinary(char* filename) {
         perror("fopen");
         exit(EXIT_FAILURE);
     }
-    int a;
-    int* binary=(int*)malloc(sizeof(int*)*256);
+    char* binary=malloc(256);
     for (int x=0; x<256; x++) {
-        a=fscanf(fp, "%d\n", &binary[x]);
-        printf("Binary: %d\n", a);
+        fread(&binary[x], 257,1, fp);
+        printf("Binary: %d, %d\n", binary[x], x);
     }
 
 }
