@@ -2,48 +2,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
-typedef struct pageTable {
-    int frame[256];
-    int validBit[256];
-}pageTable;
-
-typedef struct translationLookasideBuffer {
-    int pageNumber[16];
-    int frame[16];
-}translationLookasideBuffer;
-
-translationLookasideBuffer tlb;
-pageTable pTable;
-
-char* binary;
-int memory[256][256];
-int memIndex;
-int tlbIndex;
-
-void read_from_file(char* filename){
-    FILE *fp = fopen(filename, "r");
-    if (!fp) {
-        perror("fopen");
-        exit(EXIT_FAILURE);
-    }
-    
-    int* page = NULL;
-
-    page=(int*)malloc(sizeof(int*)*15);
-
-    int pageNumber;
-    int offset;
-
-    for (int i=0; i<15; i++) {
-        fscanf(fp, "%d\n", &page[i]);
-        pageNumber=(page[i]>>8)&0x00FF;
-        offset=page[i]&0x00FF;
-        printf("%d\n",page[i]);
-        printf("%d\n",pageNumber);
-        printf("%d\n",offset);
-    }
-}
+#include "paging.h"
 
 void readBinary(char* filename) {
     FILE *fp = fopen(filename, "r");
@@ -56,11 +15,12 @@ void readBinary(char* filename) {
         fread(&binary[x], 65537,1, fp);
         //printf("Binary: %d, %d\n", binary[x], x);
     }
-    printf("%d\n",binary[64243]);
+    //printf("%d\n",binary[64243]);
 
 }
 
 int findFrame(int pageNum, int offset) {
+    total+=1;
     int foundIndex=0;
     bool inTLB;
     for (int x=0; x<16; x++) {
@@ -70,13 +30,13 @@ int findFrame(int pageNum, int offset) {
             break;
         }
     }
-    printf("a\n");
+    //printf("a\n");
     //TLB miss
     if (!inTLB) {
-        printf("b\n");
-        printf("%d\n",pTable.validBit[pageNum]);
+        //printf("b\n");
+        //printf("%d\n",pTable.validBit[pageNum]);
         if (pTable.validBit[pageNum]==0) {
-            printf("c\n");
+            //printf("c\n");
             //Page fault; consult backing store.
             int start=pageNum*256;
             for (int i=0; i<256; i++) {
@@ -97,8 +57,9 @@ int findFrame(int pageNum, int offset) {
             pTable.validBit[pageNum]=1;
 
             //Finally, access memory from frame & offset
-            printf("Do it: %d\n",memory[memIndex][offset]);
+            printf("%d, %d, %d\n",logicalAddr, pageNum*256, memory[memIndex][offset]);
             memIndex++;
+            numFault+=1;
             return memory[memIndex][offset];
         }
         else {
@@ -111,7 +72,7 @@ int findFrame(int pageNum, int offset) {
             }
 
             //Found frame in page table
-            printf("Oh yeah do it: %d\n",memory[pTable.frame[pageNum]][offset]);
+            printf("%d, %d, %d\n",logicalAddr, pageNum*256, memory[pTable.frame[pageNum]][offset]);
             return memory[pTable.frame[pageNum]][offset];
         }
     }
@@ -122,26 +83,64 @@ int findFrame(int pageNum, int offset) {
             printf("%d, %d\n",memory[tlb.pageNumber[foundIndex]][j],j);
         }
         */
-        printf("%d\n",tlb.pageNumber[foundIndex]);
-        printf("%d\n",offset);
-        printf("Yeah do it: %d\n",memory[tlb.frame[foundIndex]][offset]);
+        //printf("%d\n",tlb.pageNumber[foundIndex]);
+        //printf("%d\n",offset);
+        printf("%d, %d, %d\n",logicalAddr, pageNum*256, memory[tlb.frame[foundIndex]][offset]);
+        numTLBHit+=1;
         return memory[tlb.frame[foundIndex]][offset];
     }
-    return 0;
 }
 
-int main() {
+void read_from_file(char* filename){
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+    
+    int* page = NULL;
+
+    page=(int*)malloc(sizeof(int*)*15);
+
+    int pageNumber;
+    int offset;
+
+    for (int i=0; i<1000; i++) {
+        fscanf(fp, "%d\n", &page[i]);
+        pageNumber=(page[i]>>8)&0x00FF;
+        offset=page[i]&0x00FF;
+        //printf("%d\n",page[i]);
+        //printf("%d\n",pageNumber);
+        //printf("%d\n",offset);
+        logicalAddr=page[i];
+        findFrame(pageNumber, offset);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2){
+        fprintf(stderr,"SYNOPSIS: %s <file name>\n",argv[0]);
+        return 1;
+    }
+
     for (int x=0; x<256; x++) {
         pTable.validBit[x]=0;
     }
-    read_from_file("addresses.txt");
     readBinary("BACKING_STORE.bin");
-    findFrame(250, 243);
+    read_from_file(argv[1]);
+    printf("Page-fault rate- %f\n",numFault/total);
+    printf("TLB hit rate- %f\n",numTLBHit/total);
     /*
+    findFrame(255,255);
+    findFrame(250, 243);
+    findFrame(29,167);
+    
     for (int y=0; y<256; y++) {
         printf("m %d\n",memory[0][y]);
     }
-    */
+    
     findFrame(250, 242);
+    findFrame(29,166);
+    */
     return 0;
 }
