@@ -22,7 +22,7 @@ void readBinary(char* filename) {
 int findFrame(int pageNum, int offset) {
     total+=1;
     int foundIndex=0;
-    bool inTLB;
+    bool inTLB=false;
     for (int x=0; x<16; x++) {
         if (tlb.pageNumber[x]==pageNum) {
             inTLB=true;
